@@ -18,7 +18,8 @@
     "sqlite3": "^5.1.6",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "openai": "^4.28.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

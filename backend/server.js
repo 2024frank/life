@@ -5,6 +5,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const todoRoutes = require('./routes/todos');
+const aiRoutes = require('./routes/ai');
 const { initDatabase } = require('./database/db');
 
 const app = express();
@@ -26,6 +27,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/todos', todoRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Initialize database
 initDatabase().then(() => {
