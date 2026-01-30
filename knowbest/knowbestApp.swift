@@ -9,6 +9,11 @@ import SwiftUI
 
 @main
 struct knowbestApp: App {
+    init() {
+        // Request notification permissions on app launch
+        NotificationManager.shared.requestAuthorization()
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
