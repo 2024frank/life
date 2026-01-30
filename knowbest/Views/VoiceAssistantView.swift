@@ -199,7 +199,44 @@ struct VoiceAssistantView: View {
         
         Task {
             do {
-                let response = try await OpenAIService.shared.parseUserInput(text, conversationHistory: conversationHistory)
+                // Try OpenAI first, fallback to AIService if no key
+                let response: ParsedTodoResponse
+                if UserDefaults.standard.string(forKey: "OpenAIAPIKey")?.isEmpty == false {
+                    response = try await OpenAIService.shared.parseUserInput(text, conversationHistory: conversationHistory)
+                } else {
+                    // Use AIService for rule-based parsing (Siri-like)
+                    let parsedTodos = await AIService.shared.parseNaturalLanguage(text)
+                    let todoItems = parsedTodos.map { todo in
+                        ParsedTodoResponse.ParsedTodoItem(
+                            title: todo.title,
+                            description: todo.description.isEmpty ? nil : todo.description,
+                            dueDate: todo.dueDate?.ISO8601Format(),
+                            reminderDate: todo.reminderDate?.ISO8601Format(),
+                            priority: todo.priority.rawValue.lowercased(),
+                            category: todo.category,
+                            isRecurring: nil,
+                            recurrencePattern: nil
+                        )
+                    }
+                    
+                    // Check if we need clarification
+                    var questions: [String]? = nil
+                    let needsClarification = todoItems.isEmpty || (todoItems.first?.dueDate == nil && text.lowercased().contains("remind"))
+                    
+                    if needsClarification {
+                        if todoItems.isEmpty {
+                            questions = ["I didn't catch that. Could you say it again? For example, 'Remind me to call the dentist tomorrow at 2pm'."]
+                        } else if todoItems.first?.dueDate == nil {
+                            questions = ["When would you like to be reminded about this?"]
+                        }
+                    }
+                    
+                    response = ParsedTodoResponse(
+                        todos: todoItems,
+                        questions: questions,
+                        needsClarification: needsClarification
+                    )
+                }
                 
                 await MainActor.run {
                     isProcessing = false

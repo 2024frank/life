@@ -148,20 +148,77 @@ class OpenAIService {
     }
     
     private func fallbackParse(_ text: String) -> ParsedTodoResponse {
-        // Synchronous fallback - create a simple todo from text
+        // Use synchronous parsing for immediate response (Siri-like behavior)
+        let lowerText = text.lowercased()
+        var questions: [String]? = nil
+        var needsClarification = false
+        
+        // Check if we can parse date/time
+        let hasTime = lowerText.contains("at") && (lowerText.contains("am") || lowerText.contains("pm") || lowerText.contains(":") || lowerText.contains("hour") || lowerText.contains("minute"))
+        let hasDate = lowerText.contains("today") || lowerText.contains("tomorrow") || lowerText.contains("monday") || lowerText.contains("tuesday") || lowerText.contains("wednesday") || lowerText.contains("thursday") || lowerText.contains("friday") || lowerText.contains("saturday") || lowerText.contains("sunday") || lowerText.contains("in ")
+        
+        // If user says "remind" but no time/date, ask for clarification
+        if !hasTime && !hasDate && (lowerText.contains("remind") || lowerText.contains("todo") || lowerText.contains("task")) {
+            questions = ["When would you like to be reminded about this?"]
+            needsClarification = true
+        }
+        
+        // Extract title - remove common command phrases
+        var title = text
+        title = title.replacingOccurrences(of: "remind me to", with: "", options: .caseInsensitive)
+        title = title.replacingOccurrences(of: "remind me", with: "", options: .caseInsensitive)
+        title = title.replacingOccurrences(of: "can you", with: "", options: .caseInsensitive)
+        title = title.replacingOccurrences(of: "please", with: "", options: .caseInsensitive)
+        title = title.replacingOccurrences(of: "hey assistant", with: "", options: .caseInsensitive)
+        title = title.trimmingCharacters(in: .whitespaces)
+        
+        // Extract priority
+        var priority: String? = nil
+        if lowerText.contains("urgent") || lowerText.contains("asap") {
+            priority = "urgent"
+        } else if lowerText.contains("important") || lowerText.contains("high priority") {
+            priority = "high"
+        } else if lowerText.contains("low priority") {
+            priority = "low"
+        }
+        
+        // Extract category
+        var category: String? = nil
+        if lowerText.contains("work") || lowerText.contains("meeting") || lowerText.contains("office") {
+            category = "Work"
+        } else if lowerText.contains("shopping") || lowerText.contains("buy") || lowerText.contains("grocery") {
+            category = "Shopping"
+        } else if lowerText.contains("health") || lowerText.contains("doctor") || lowerText.contains("gym") {
+            category = "Health"
+        } else if lowerText.contains("family") {
+            category = "Family"
+        } else if lowerText.contains("bill") || lowerText.contains("pay") {
+            category = "Bills"
+        }
+        
+        // Try to parse date/time using simple patterns
+        var dueDate: String? = nil
+        var reminderDate: String? = nil
+        
+        // Pattern: "tomorrow at 2pm" or "today at 5pm"
+        if let match = try? NSRegularExpression(pattern: #"(today|tomorrow)\s+at\s+(\d{1,2}):?(\d{2})?\s*(am|pm)"#, options: .caseInsensitive).firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
+            // Date/time found - will be parsed by AIService in async call
+            // For now, just mark that we have it
+        }
+        
         return ParsedTodoResponse(
             todos: [ParsedTodoResponse.ParsedTodoItem(
-                title: text,
+                title: title.isEmpty ? text : title,
                 description: nil,
-                dueDate: nil,
-                reminderDate: nil,
-                priority: nil,
-                category: nil,
+                dueDate: dueDate,
+                reminderDate: reminderDate,
+                priority: priority,
+                category: category,
                 isRecurring: nil,
                 recurrencePattern: nil
             )],
-            questions: ["When would you like to be reminded about this?"],
-            needsClarification: true
+            questions: questions,
+            needsClarification: needsClarification
         )
     }
 }
