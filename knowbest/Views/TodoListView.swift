@@ -170,6 +170,10 @@ struct TodoListView: View {
             .onAppear {
                 checkEveningPrompt()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .openVoiceAssistant)) { _ in
+                // Open voice assistant when triggered by Siri
+                showingVoiceAssistant = true
+            }
         }
     }
     
