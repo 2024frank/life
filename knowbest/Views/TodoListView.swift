@@ -13,6 +13,7 @@ struct TodoListView: View {
     @State private var showingAIChat = false
     @State private var showingVoiceAssistant = false
     @State private var showingEveningPrompt = false
+    @State private var showingSettings = false
     @State private var selectedTodo: TodoItem?
     @State private var filterOption: FilterOption = .all
     @State private var searchText = ""
@@ -113,6 +114,14 @@ struct TodoListView: View {
                         } label: {
                             Label("Text Chat", systemImage: "sparkles")
                         }
+                        
+                        Divider()
+                        
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Label("Settings", systemImage: "gearshape")
+                        }
                     } label: {
                         Image(systemName: "waveform")
                             .font(.title2)
@@ -121,12 +130,22 @@ struct TodoListView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingAddTodo = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.blue)
+                    HStack {
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Image(systemName: "gearshape")
+                                .font(.title3)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Button {
+                            showingAddTodo = true
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.blue)
+                        }
                     }
                 }
             }
@@ -141,6 +160,9 @@ struct TodoListView: View {
             }
             .sheet(isPresented: $showingEveningPrompt) {
                 EveningPromptView(store: store)
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
             }
             .sheet(item: $selectedTodo) { todo in
                 AddEditTodoView(store: store, todo: todo)
