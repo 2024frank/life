@@ -24,6 +24,7 @@ struct ParsedTodoResponse: Codable {
     let questions: [String]?
     let needsClarification: Bool
     let response: String?  // Natural language response for voice
+    let emotion: String?   // happy, encouraging, calm, excited, understanding, neutral
     
     struct ParsedTodoItem: Codable {
         let title: String
@@ -36,11 +37,12 @@ struct ParsedTodoResponse: Codable {
         let recurrencePattern: String?
     }
     
-    init(todos: [ParsedTodoItem], questions: [String]?, needsClarification: Bool, response: String? = nil) {
+    init(todos: [ParsedTodoItem], questions: [String]?, needsClarification: Bool, response: String? = nil, emotion: String? = nil) {
         self.todos = todos
         self.questions = questions
         self.needsClarification = needsClarification
         self.response = response
+        self.emotion = emotion
     }
 }
 

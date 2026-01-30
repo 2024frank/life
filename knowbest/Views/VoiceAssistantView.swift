@@ -123,7 +123,8 @@ struct VoiceAssistantView: View {
             .onChange(of: voiceManager.isActivated) { activated in
                 if activated {
                     Task {
-                        await elevenLabs.speak("Yes, how can I help you?")
+                        // Friendly greeting with happy emotion
+                        await elevenLabs.speak("Hey! What can I help you with?", emotionString: "happy")
                     }
                 }
             }
@@ -253,7 +254,8 @@ struct VoiceAssistantView: View {
                         conversationHistory.append(questionText)
                         
                         Task {
-                            await elevenLabs.speak(questionText)
+                            // Use calm emotion for questions
+                            await elevenLabs.speak(questionText, emotionString: "calm")
                         }
                     } else {
                         currentQuestion = nil
@@ -261,7 +263,8 @@ struct VoiceAssistantView: View {
                         // Process todos
                         if !response.todos.isEmpty {
                             // Use response from AI if available, otherwise generate our own
-                            var responseText = response.response ?? "I've created \(response.todos.count) todo\(response.todos.count > 1 ? "s" : "") for you."
+                            let responseText = response.response ?? "I've created \(response.todos.count) todo\(response.todos.count > 1 ? "s" : "") for you."
+                            let emotion = response.emotion ?? "encouraging"
                             
                             for todoData in response.todos {
                                 let todo = createTodo(from: todoData)
@@ -282,14 +285,16 @@ struct VoiceAssistantView: View {
                             assistantResponse = responseText
                             
                             Task {
-                                await elevenLabs.speak(responseText)
+                                // Use emotion from AI response
+                                await elevenLabs.speak(responseText, emotionString: emotion)
                             }
                         } else {
                             let noTodoResponse = "I couldn't understand that. Could you try again? For example, say 'Remind me to call the dentist tomorrow at 2pm'."
                             conversationHistory.append(noTodoResponse)
                             
                             Task {
-                                await elevenLabs.speak(noTodoResponse)
+                                // Use understanding emotion for errors
+                                await elevenLabs.speak(noTodoResponse, emotionString: "understanding")
                             }
                         }
                     }
@@ -301,7 +306,8 @@ struct VoiceAssistantView: View {
                     conversationHistory.append(errorResponse)
                     
                     Task {
-                        await elevenLabs.speak(errorResponse)
+                        // Use calm, understanding emotion for errors
+                        await elevenLabs.speak(errorResponse, emotionString: "understanding")
                     }
                 }
             }

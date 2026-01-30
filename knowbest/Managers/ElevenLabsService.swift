@@ -9,12 +9,72 @@ import Foundation
 import Combine
 import AVFoundation
 
-class ElevenLabsService: NSObject, ObservableObject {
+// Emotion types for voice modulation
+enum VoiceEmotion: String {
+    case happy = "happy"
+    case encouraging = "encouraging"
+    case calm = "calm"
+    case excited = "excited"
+    case understanding = "understanding"
+    case neutral = "neutral"
+    
+    // Voice settings for each emotion
+    var voiceSettings: [String: Any] {
+        switch self {
+        case .happy:
+            return [
+                "stability": 0.3,           // Lower = more expressive
+                "similarity_boost": 0.75,
+                "style": 0.8,               // High style = more emotional
+                "use_speaker_boost": true
+            ]
+        case .encouraging:
+            return [
+                "stability": 0.4,
+                "similarity_boost": 0.8,
+                "style": 0.6,
+                "use_speaker_boost": true
+            ]
+        case .calm:
+            return [
+                "stability": 0.7,           // Higher = more stable/calm
+                "similarity_boost": 0.85,
+                "style": 0.3,               // Lower style = more subdued
+                "use_speaker_boost": true
+            ]
+        case .excited:
+            return [
+                "stability": 0.25,          // Very expressive
+                "similarity_boost": 0.7,
+                "style": 0.9,               // Maximum emotion
+                "use_speaker_boost": true
+            ]
+        case .understanding:
+            return [
+                "stability": 0.55,
+                "similarity_boost": 0.8,
+                "style": 0.4,               // Gentle, warm
+                "use_speaker_boost": true
+            ]
+        case .neutral:
+            return [
+                "stability": 0.5,
+                "similarity_boost": 0.75,
+                "style": 0.5,
+                "use_speaker_boost": true
+            ]
+        }
+    }
+}
+
+class ElevenLabsService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     static let shared = ElevenLabsService()
     
     @Published var isSpeaking = false
     
     private var audioPlayer: AVAudioPlayer?
+    private var systemSynthesizer: AVSpeechSynthesizer?
+    
     private var apiKey: String {
         if let key = UserDefaults.standard.string(forKey: "ElevenLabsAPIKey"), !key.isEmpty {
             return key
@@ -33,11 +93,15 @@ class ElevenLabsService: NSObject, ObservableObject {
         UserDefaults.standard.set(key, forKey: "ElevenLabsAPIKey")
     }
     
-    func speak(_ text: String) async {
+    // Main speak function with emotion support
+    func speak(_ text: String, emotion: VoiceEmotion = .neutral) async {
         guard !apiKey.isEmpty else {
-            // Fallback to AVSpeechSynthesizer if no API key
-            await speakWithSystemVoice(text)
+            await speakWithSystemVoice(text, emotion: emotion)
             return
+        }
+        
+        await MainActor.run {
+            isSpeaking = true
         }
         
         do {
@@ -49,11 +113,8 @@ class ElevenLabsService: NSObject, ObservableObject {
             
             let requestBody: [String: Any] = [
                 "text": text,
-                "model_id": "eleven_turbo_v2_5",
-                "voice_settings": [
-                    "stability": 0.5,
-                    "similarity_boost": 0.75
-                ]
+                "model_id": "eleven_multilingual_v2",  // Better emotion support
+                "voice_settings": emotion.voiceSettings
             ]
             
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
@@ -63,7 +124,7 @@ class ElevenLabsService: NSObject, ObservableObject {
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
                 print("Eleven Labs API error")
-                await speakWithSystemVoice(text)
+                await speakWithSystemVoice(text, emotion: emotion)
                 return
             }
             
@@ -73,8 +134,12 @@ class ElevenLabsService: NSObject, ObservableObject {
             
             await MainActor.run {
                 do {
+                    // Configure audio session for playback
+                    try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenContent)
+                    try AVAudioSession.sharedInstance().setActive(true)
+                    
                     audioPlayer = try AVAudioPlayer(contentsOf: tempURL)
-                    isSpeaking = true
+                    audioPlayer?.delegate = self
                     audioPlayer?.play()
                 } catch {
                     print("Error playing audio: \(error.localizedDescription)")
@@ -84,22 +149,53 @@ class ElevenLabsService: NSObject, ObservableObject {
             
         } catch {
             print("Error with Eleven Labs: \(error.localizedDescription)")
-            await speakWithSystemVoice(text)
+            await speakWithSystemVoice(text, emotion: emotion)
         }
     }
     
-    private func speakWithSystemVoice(_ text: String) async {
+    // Convenience method for speaking with emotion string from API
+    func speak(_ text: String, emotionString: String?) async {
+        let emotion = VoiceEmotion(rawValue: emotionString ?? "neutral") ?? .neutral
+        await speak(text, emotion: emotion)
+    }
+    
+    private func speakWithSystemVoice(_ text: String, emotion: VoiceEmotion = .neutral) async {
         await MainActor.run {
-            let synthesizer = AVSpeechSynthesizer()
+            isSpeaking = true
+            systemSynthesizer = AVSpeechSynthesizer()
             let utterance = AVSpeechUtterance(string: text)
             utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-            utterance.rate = 0.5
-            synthesizer.speak(utterance)
+            
+            // Adjust rate and pitch based on emotion
+            switch emotion {
+            case .happy, .excited:
+                utterance.rate = 0.55
+                utterance.pitchMultiplier = 1.1
+            case .calm, .understanding:
+                utterance.rate = 0.45
+                utterance.pitchMultiplier = 0.95
+            case .encouraging:
+                utterance.rate = 0.5
+                utterance.pitchMultiplier = 1.05
+            case .neutral:
+                utterance.rate = 0.5
+                utterance.pitchMultiplier = 1.0
+            }
+            
+            systemSynthesizer?.speak(utterance)
         }
     }
     
     func stopSpeaking() {
         audioPlayer?.stop()
+        systemSynthesizer?.stopSpeaking(at: .immediate)
         isSpeaking = false
+    }
+    
+    // AVAudioPlayerDelegate
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        DispatchQueue.main.async {
+            self.isSpeaking = false
+        }
     }
 }

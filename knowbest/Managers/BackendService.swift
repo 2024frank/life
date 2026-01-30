@@ -131,7 +131,8 @@ class BackendService {
                 },
                 questions: parsed.questions,
                 needsClarification: parsed.needsClarification,
-                response: parsed.response
+                response: parsed.response,
+                emotion: parsed.emotion
             )
         } else if httpResponse.statusCode == 401 {
             throw BackendError.notAuthenticated
@@ -222,6 +223,7 @@ struct BackendParsedResponse: Codable {
     let questions: [String]?
     let needsClarification: Bool
     let response: String?
+    let emotion: String?  // happy, encouraging, calm, excited, understanding, neutral
     
     struct BackendParsedTodo: Codable {
         let title: String
