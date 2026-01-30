@@ -15,10 +15,22 @@ class CalendarManager {
     private init() {}
     
     func requestAccess() async -> Bool {
-        if #available(iOS 17.0, *) {
-            return await eventStore.requestFullAccessToEvents()
-        } else {
-            return await eventStore.requestAccess(to: .event)
+        do {
+            if #available(iOS 17.0, *) {
+                return try await eventStore.requestFullAccessToEvents()
+            } else {
+                var granted = false
+                do {
+                    granted = try await eventStore.requestAccess(to: .event)
+                } catch {
+                    print("Error requesting calendar access: \(error.localizedDescription)")
+                    return false
+                }
+                return granted
+            }
+        } catch {
+            print("Error requesting calendar access: \(error.localizedDescription)")
+            return false
         }
     }
     
