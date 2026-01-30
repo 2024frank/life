@@ -16,46 +16,75 @@ class VoiceActivationManager: NSObject, ObservableObject {
     @Published var isListening = false
     @Published var isActivated = false
     @Published var recognizedText = ""
+    @Published var permissionStatus: PermissionStatus = .notDetermined
+    
+    enum PermissionStatus {
+        case notDetermined
+        case authorized
+        case denied
+    }
     
     private let audioEngine = AVAudioEngine()
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
-    private let wakeWord = "hey assistant"
+    private let wakeWord = "hey adam"  // Changed to "hey adam"
     
     private var isWaitingForWakeWord = true
     private var continuousText = ""
     
     override init() {
         super.init()
-        requestAuthorization()
+        // Don't auto-request - wait for user action
+        checkPermissions()
     }
     
-    func requestAuthorization() {
-        SFSpeechRecognizer.requestAuthorization { status in
-            DispatchQueue.main.async {
-                switch status {
-                case .authorized:
-                    print("Speech recognition authorized")
-                case .denied, .restricted, .notDetermined:
-                    print("Speech recognition not authorized")
-                @unknown default:
-                    break
-                }
+    func checkPermissions() {
+        let speechStatus = SFSpeechRecognizer.authorizationStatus()
+        let micStatus = AVAudioSession.sharedInstance().recordPermission
+        
+        DispatchQueue.main.async {
+            if speechStatus == .authorized && micStatus == .granted {
+                self.permissionStatus = .authorized
+            } else if speechStatus == .denied || micStatus == .denied {
+                self.permissionStatus = .denied
+            } else {
+                self.permissionStatus = .notDetermined
             }
         }
+    }
+    
+    func requestAuthorization(completion: @escaping (Bool) -> Void) {
+        var speechGranted = false
+        var micGranted = false
         
+        let group = DispatchGroup()
+        
+        group.enter()
+        SFSpeechRecognizer.requestAuthorization { status in
+            speechGranted = (status == .authorized)
+            group.leave()
+        }
+        
+        group.enter()
         AVAudioSession.sharedInstance().requestRecordPermission { granted in
-            if granted {
-                print("Microphone permission granted")
-            } else {
-                print("Microphone permission denied")
-            }
+            micGranted = granted
+            group.leave()
+        }
+        
+        group.notify(queue: .main) {
+            let success = speechGranted && micGranted
+            self.permissionStatus = success ? .authorized : .denied
+            completion(success)
         }
     }
     
     func startListening() {
         guard !isListening else { return }
+        guard permissionStatus == .authorized else {
+            print("Permissions not granted")
+            return
+        }
         
         do {
             let audioSession = AVAudioSession.sharedInstance()
@@ -92,7 +121,8 @@ class VoiceActivationManager: NSObject, ObservableObject {
                     self.continuousText = text
                     
                     if self.isWaitingForWakeWord {
-                        if text.contains(self.wakeWord) {
+                        // Check for "hey adam" or "hey assistant"
+                        if text.contains(self.wakeWord) || text.contains("hey assistant") {
                             DispatchQueue.main.async {
                                 self.isActivated = true
                                 self.isWaitingForWakeWord = false
@@ -101,8 +131,10 @@ class VoiceActivationManager: NSObject, ObservableObject {
                         }
                     } else {
                         DispatchQueue.main.async {
-                            // Remove wake word from recognized text
-                            let cleanedText = text.replacingOccurrences(of: self.wakeWord, with: "", options: .caseInsensitive)
+                            // Remove wake words from recognized text
+                            var cleanedText = text
+                            cleanedText = cleanedText.replacingOccurrences(of: self.wakeWord, with: "", options: .caseInsensitive)
+                            cleanedText = cleanedText.replacingOccurrences(of: "hey assistant", with: "", options: .caseInsensitive)
                             self.recognizedText = cleanedText.trimmingCharacters(in: .whitespaces)
                         }
                     }

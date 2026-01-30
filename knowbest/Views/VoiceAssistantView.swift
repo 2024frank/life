@@ -19,35 +19,174 @@ struct VoiceAssistantView: View {
     @State private var assistantResponse = ""
     @State private var showAPIKeySettings = false
     @State private var showLoginSheet = false
+    @State private var isRequestingPermission = false
     
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Status indicator
-                statusHeader
+                // Check permission status first
+                if voiceManager.permissionStatus == .notDetermined {
+                    permissionRequestView
+                } else if voiceManager.permissionStatus == .denied {
+                    permissionDeniedView
+                } else {
+                    // Normal voice assistant UI
+                    voiceAssistantContent
+                }
+            }
+            .navigationTitle("Adam")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        showAPIKeySettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                }
                 
-                // Conversation area
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
-                            if conversationHistory.isEmpty {
-                                welcomeMessage
-                            } else {
-                                ForEach(Array(conversationHistory.enumerated()), id: \.offset) { index, message in
-                                    if index % 2 == 0 {
-                                        UserMessage(text: message)
-                                    } else {
-                                        AssistantMessage(text: message)
-                                    }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        voiceManager.stopListening()
+                        dismiss()
+                    }
+                }
+            }
+            .sheet(isPresented: $showAPIKeySettings) {
+                AccountSettingsView()
+            }
+            .sheet(isPresented: $showLoginSheet) {
+                AccountSettingsView()
+            }
+        }
+    }
+    
+    // MARK: - Permission Views
+    
+    private var permissionRequestView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            
+            Image(systemName: "mic.circle.fill")
+                .font(.system(size: 80))
+                .foregroundColor(.purple)
+            
+            Text("Adam needs permission")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            Text("To hear your voice commands, Adam needs access to your microphone and speech recognition.")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            
+            Button {
+                isRequestingPermission = true
+                voiceManager.requestAuthorization { success in
+                    isRequestingPermission = false
+                    if success {
+                        voiceManager.startListening()
+                    }
+                }
+            } label: {
+                HStack {
+                    if isRequestingPermission {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: "mic.fill")
+                    }
+                    Text("Enable Voice")
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.purple)
+                .cornerRadius(14)
+            }
+            .disabled(isRequestingPermission)
+            .padding(.horizontal, 40)
+            
+            Spacer()
+        }
+    }
+    
+    private var permissionDeniedView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            
+            Image(systemName: "mic.slash.circle.fill")
+                .font(.system(size: 80))
+                .foregroundColor(.red)
+            
+            Text("Microphone Access Denied")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            Text("Adam can't hear you without microphone access. Please enable it in Settings.")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            
+            Button {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "gearshape.fill")
+                    Text("Open Settings")
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue)
+                .cornerRadius(14)
+            }
+            .padding(.horizontal, 40)
+            
+            Button("Try Again") {
+                voiceManager.checkPermissions()
+            }
+            .foregroundColor(.secondary)
+            
+            Spacer()
+        }
+    }
+    
+    // MARK: - Main Voice Assistant Content
+    
+    private var voiceAssistantContent: some View {
+        VStack(spacing: 0) {
+            // Status indicator
+            statusHeader
+            
+            // Conversation area
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        if conversationHistory.isEmpty {
+                            welcomeMessage
+                        } else {
+                            ForEach(Array(conversationHistory.enumerated()), id: \.offset) { index, message in
+                                if index % 2 == 0 {
+                                    UserMessage(text: message)
+                                } else {
+                                    AssistantMessage(text: message)
                                 }
-                                
-                                if let question = currentQuestion {
-                                    AssistantMessage(text: question, isQuestion: true)
-                                }
-                                
-                                if isProcessing {
-                                    HStack {
-                                        ProgressView()
+                            }
+                            
+                            if let question = currentQuestion {
+                                AssistantMessage(text: question, isQuestion: true)
+                            }
+                            
+                            if isProcessing {
+                                HStack {
+                                    ProgressView()
                                         Text("Processing...")
                                             .font(.caption)
                                             .foregroundColor(.secondary)
@@ -90,48 +229,25 @@ struct VoiceAssistantView: View {
                 .frame(maxWidth: .infinity)
                 .background(Color(.systemGray6))
             }
-            .navigationTitle("Voice Assistant")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showAPIKeySettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        voiceManager.stopListening()
-                        dismiss()
-                    }
-                }
-            }
-            .sheet(isPresented: $showAPIKeySettings) {
-                AccountSettingsView()
-            }
-            .sheet(isPresented: $showLoginSheet) {
-                AccountSettingsView()
-            }
-            .onAppear {
+        }
+        .onAppear {
+            if voiceManager.permissionStatus == .authorized {
                 voiceManager.startListening()
             }
-            .onDisappear {
-                voiceManager.stopListening()
-            }
-            .onChange(of: voiceManager.isActivated) { activated in
-                if activated {
-                    Task {
-                        // Friendly greeting with happy emotion
-                        await elevenLabs.speak("Hey! What can I help you with?", emotionString: "happy")
-                    }
+        }
+        .onDisappear {
+            voiceManager.stopListening()
+        }
+        .onChange(of: voiceManager.isActivated) { activated in
+            if activated {
+                Task {
+                    await elevenLabs.speak("Hey! What can I help you with?", emotionString: "happy")
                 }
             }
-            .onChange(of: voiceManager.recognizedText) { text in
-                if voiceManager.isActivated && !text.isEmpty {
-                    handleUserInput(text)
-                }
+        }
+        .onChange(of: voiceManager.recognizedText) { text in
+            if voiceManager.isActivated && !text.isEmpty {
+                handleUserInput(text)
             }
         }
     }
@@ -139,14 +255,23 @@ struct VoiceAssistantView: View {
     private var statusHeader: some View {
         HStack {
             Circle()
-                .fill(voiceManager.isListening ? (voiceManager.isActivated ? Color.green : Color.orange) : Color.gray)
+                .fill(voiceManager.isListening ? (voiceManager.isActivated ? Color.green : Color.purple) : Color.gray)
                 .frame(width: 12, height: 12)
             
-            Text(voiceManager.isListening ? (voiceManager.isActivated ? "Listening..." : "Say 'Hey Assistant'") : "Not Listening")
+            Text(voiceManager.isListening ? (voiceManager.isActivated ? "Adam is listening..." : "Say 'Hey Adam'") : "Tap to start")
                 .font(.caption)
                 .foregroundColor(.secondary)
             
             Spacer()
+            
+            if !voiceManager.isListening {
+                Button {
+                    voiceManager.startListening()
+                } label: {
+                    Image(systemName: "mic.fill")
+                        .foregroundColor(.purple)
+                }
+            }
         }
         .padding()
         .background(Color(.systemGray6))
@@ -156,14 +281,25 @@ struct VoiceAssistantView: View {
         VStack(spacing: 16) {
             Image(systemName: "waveform")
                 .font(.system(size: 50))
-                .foregroundColor(.blue)
-            Text("Voice Assistant Ready")
+                .foregroundColor(.purple)
+            Text("Adam is Ready")
                 .font(.title2)
                 .fontWeight(.bold)
-            Text("Say 'Hey Assistant' to start, then tell me what you need to do!")
+            Text("Say 'Hey Adam' to start, then tell me what you need!")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+            
+            if !BackendService.shared.isLoggedIn {
+                HStack {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(.orange)
+                    Text("Log in for smarter AI")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+                .padding(.top, 8)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
@@ -171,10 +307,10 @@ struct VoiceAssistantView: View {
     
     private var waitingState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "mic.slash")
+            Image(systemName: "mic.fill")
                 .font(.system(size: 40))
-                .foregroundColor(.gray)
-            Text("Waiting for 'Hey Assistant'...")
+                .foregroundColor(.purple)
+            Text("Say 'Hey Adam'...")
                 .font(.headline)
                 .foregroundColor(.secondary)
         }
