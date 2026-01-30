@@ -8,8 +8,15 @@
 import SwiftUI
 
 struct ContentView: View {
+    @AppStorage("HasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @StateObject private var permissionManager = PermissionManager.shared
+    
     var body: some View {
-        TodoListView()
+        if hasCompletedOnboarding {
+            TodoListView()
+        } else {
+            OnboardingView(isComplete: $hasCompletedOnboarding)
+        }
     }
 }
 

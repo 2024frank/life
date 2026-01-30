@@ -16,7 +16,16 @@ class VoiceActivationManager: NSObject, ObservableObject {
     @Published var isListening = false
     @Published var isActivated = false
     @Published var recognizedText = ""
-    @Published var permissionStatus: PermissionStatus = .notDetermined
+    var permissionStatus: PermissionStatus {
+        let pm = PermissionManager.shared
+        if pm.microphoneGranted && pm.speechGranted {
+            return .authorized
+        } else if pm.hasRequestedBefore && (!pm.microphoneGranted || !pm.speechGranted) {
+            return .denied
+        } else {
+            return .notDetermined
+        }
+    }
     
     enum PermissionStatus {
         case notDetermined
@@ -35,46 +44,16 @@ class VoiceActivationManager: NSObject, ObservableObject {
     
     override init() {
         super.init()
-        // Don't auto-request - wait for user action
-        checkPermissions()
     }
     
     func checkPermissions() {
-        let speechStatus = SFSpeechRecognizer.authorizationStatus()
-        let micStatus = AVAudioSession.sharedInstance().recordPermission
-        
-        DispatchQueue.main.async {
-            if speechStatus == .authorized && micStatus == .granted {
-                self.permissionStatus = .authorized
-            } else if speechStatus == .denied || micStatus == .denied {
-                self.permissionStatus = .denied
-            } else {
-                self.permissionStatus = .notDetermined
-            }
-        }
+        PermissionManager.shared.checkAllPermissions()
+        objectWillChange.send()
     }
     
     func requestAuthorization(completion: @escaping (Bool) -> Void) {
-        var speechGranted = false
-        var micGranted = false
-        
-        let group = DispatchGroup()
-        
-        group.enter()
-        SFSpeechRecognizer.requestAuthorization { status in
-            speechGranted = (status == .authorized)
-            group.leave()
-        }
-        
-        group.enter()
-        AVAudioSession.sharedInstance().requestRecordPermission { granted in
-            micGranted = granted
-            group.leave()
-        }
-        
-        group.notify(queue: .main) {
-            let success = speechGranted && micGranted
-            self.permissionStatus = success ? .authorized : .denied
+        PermissionManager.shared.requestAllPermissions {
+            let success = self.permissionStatus == .authorized
             completion(success)
         }
     }
