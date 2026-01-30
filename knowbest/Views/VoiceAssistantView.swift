@@ -187,24 +187,24 @@ struct VoiceAssistantView: View {
                             if isProcessing {
                                 HStack {
                                     ProgressView()
-                                        Text("Processing...")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .padding()
+                                    Text("Processing...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                 }
+                                .padding()
                             }
                         }
-                        .padding()
                     }
-                    .onChange(of: conversationHistory.count) { _ in
-                        if let lastIndex = conversationHistory.indices.last {
-                            withAnimation {
-                                proxy.scrollTo(lastIndex, anchor: .bottom)
-                            }
+                    .padding()
+                }
+                .onChange(of: conversationHistory.count) { _ in
+                    if let lastIndex = conversationHistory.indices.last {
+                        withAnimation {
+                            proxy.scrollTo(lastIndex, anchor: .bottom)
                         }
                     }
                 }
+            }
                 
                 Divider()
                 
