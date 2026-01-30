@@ -50,11 +50,9 @@ struct AdamShortcuts: AppShortcutsProvider {
             intent: OpenVoiceAssistantIntent(),
             phrases: [
                 "Open \(.applicationName)",
-                "Talk to Adam",
-                "Hey Adam",
-                "Ask Adam",
-                "Open Adam",
-                "Adam",
+                "Talk to \(.applicationName)",
+                "Hey \(.applicationName)",
+                "Ask \(.applicationName)",
                 "\(.applicationName)"
             ],
             shortTitle: "Adam",
