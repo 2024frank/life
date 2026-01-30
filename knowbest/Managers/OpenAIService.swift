@@ -23,6 +23,7 @@ struct ParsedTodoResponse: Codable {
     let todos: [ParsedTodoItem]
     let questions: [String]?
     let needsClarification: Bool
+    let response: String?  // Natural language response for voice
     
     struct ParsedTodoItem: Codable {
         let title: String
@@ -33,6 +34,13 @@ struct ParsedTodoResponse: Codable {
         let category: String?
         let isRecurring: Bool?
         let recurrencePattern: String?
+    }
+    
+    init(todos: [ParsedTodoItem], questions: [String]?, needsClarification: Bool, response: String? = nil) {
+        self.todos = todos
+        self.questions = questions
+        self.needsClarification = needsClarification
+        self.response = response
     }
 }
 
@@ -206,6 +214,8 @@ class OpenAIService {
             // For now, just mark that we have it
         }
         
+        let responseText = needsClarification ? questions?.first : "I'll add that to your todos."
+        
         return ParsedTodoResponse(
             todos: [ParsedTodoResponse.ParsedTodoItem(
                 title: title.isEmpty ? text : title,
@@ -218,7 +228,8 @@ class OpenAIService {
                 recurrencePattern: nil
             )],
             questions: questions,
-            needsClarification: needsClarification
+            needsClarification: needsClarification,
+            response: responseText
         )
     }
 }

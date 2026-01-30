@@ -9,9 +9,18 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
-    @State private var openAIKey: String = UserDefaults.standard.string(forKey: "OpenAIAPIKey") ?? ""
     @State private var elevenLabsKey: String = UserDefaults.standard.string(forKey: "ElevenLabsAPIKey") ?? ""
     @State private var showAPIKeyInfo = false
+    @State private var email: String = ""
+    @State private var password: String = ""
+    @State private var name: String = ""
+    @State private var isRegistering = false
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    
+    var isLoggedIn: Bool {
+        BackendService.shared.isLoggedIn
+    }
     
     var body: some View {
         NavigationStack {
@@ -20,47 +29,83 @@ struct SettingsView: View {
                     HStack {
                         Image(systemName: "sparkles")
                             .foregroundColor(.blue)
-                        Text("Voice Assistant")
+                        Text("KnowBest Assistant")
                             .font(.headline)
                     }
                 }
                 
-                Section("OpenAI API Key") {
-                    HStack {
-                        TextField("sk-...", text: $openAIKey)
-                            .textContentType(.password)
-                            .autocapitalization(.none)
-                            .autocorrectionDisabled()
+                // Account Section
+                Section("Account") {
+                    if isLoggedIn {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Logged in")
+                        }
                         
-                        if !openAIKey.isEmpty {
-                            Button {
-                                openAIKey = ""
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(.gray)
+                        HStack {
+                            Image(systemName: "brain")
+                                .foregroundColor(.purple)
+                            Text("AI powered by OpenAI (GPT-4o-mini)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Button("Log Out", role: .destructive) {
+                            BackendService.shared.logout()
+                        }
+                    } else {
+                        if isRegistering {
+                            TextField("Name", text: $name)
+                                .textContentType(.name)
+                        }
+                        
+                        TextField("Email", text: $email)
+                            .textContentType(.emailAddress)
+                            .autocapitalization(.none)
+                            .keyboardType(.emailAddress)
+                        
+                        SecureField("Password", text: $password)
+                            .textContentType(isRegistering ? .newPassword : .password)
+                        
+                        if let error = errorMessage {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                        
+                        Button {
+                            performAuth()
+                        } label: {
+                            HStack {
+                                if isLoading {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                }
+                                Text(isRegistering ? "Create Account" : "Login")
                             }
                         }
-                    }
-                    
-                    HStack {
-                        Image(systemName: openAIKey.isEmpty ? "exclamationmark.triangle" : "checkmark.circle.fill")
-                            .foregroundColor(openAIKey.isEmpty ? .orange : .green)
-                        Text(openAIKey.isEmpty ? "Not configured - using basic parsing" : "Configured - using GPT-4o-mini")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Link(destination: URL(string: "https://platform.openai.com/api-keys")!) {
+                        .disabled(email.isEmpty || password.isEmpty || isLoading)
+                        
+                        Button(isRegistering ? "Already have an account? Login" : "Don't have an account? Register") {
+                            isRegistering.toggle()
+                            errorMessage = nil
+                        }
+                        .font(.caption)
+                        
                         HStack {
-                            Image(systemName: "link")
-                            Text("Get OpenAI API Key")
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundColor(.orange)
+                            Text("Login for advanced AI features")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
                     }
                 }
                 
-                Section("Eleven Labs API Key") {
+                Section("Voice (Eleven Labs)") {
                     HStack {
-                        TextField("...", text: $elevenLabsKey)
+                        TextField("API Key (optional)", text: $elevenLabsKey)
                             .textContentType(.password)
                             .autocapitalization(.none)
                             .autocorrectionDisabled()
@@ -78,7 +123,7 @@ struct SettingsView: View {
                     HStack {
                         Image(systemName: elevenLabsKey.isEmpty ? "exclamationmark.triangle" : "checkmark.circle.fill")
                             .foregroundColor(elevenLabsKey.isEmpty ? .orange : .green)
-                        Text(elevenLabsKey.isEmpty ? "Not configured - using system voice" : "Configured - using natural voice")
+                        Text(elevenLabsKey.isEmpty ? "Using system voice" : "Using natural voice")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -97,7 +142,7 @@ struct SettingsView: View {
                     } label: {
                         HStack {
                             Image(systemName: "info.circle")
-                            Text("How to Get API Keys")
+                            Text("How It Works")
                         }
                     }
                 }
@@ -129,7 +174,7 @@ struct SettingsView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        saveKeys()
+                        saveSettings()
                     }
                     .fontWeight(.semibold)
                 }
@@ -140,8 +185,34 @@ struct SettingsView: View {
         }
     }
     
-    private func saveKeys() {
-        OpenAIService.shared.setAPIKey(openAIKey)
+    private func performAuth() {
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                if isRegistering {
+                    _ = try await BackendService.shared.register(email: email, password: password, name: name)
+                } else {
+                    _ = try await BackendService.shared.login(email: email, password: password)
+                }
+                
+                await MainActor.run {
+                    isLoading = false
+                    email = ""
+                    password = ""
+                    name = ""
+                }
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+    
+    private func saveSettings() {
         ElevenLabsService.shared.setAPIKey(elevenLabsKey)
         dismiss()
     }
@@ -154,53 +225,58 @@ struct APIKeyInfoView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text("Why API Keys?")
+                    Text("How It Works")
                         .font(.title2)
                         .fontWeight(.bold)
                     
-                    Text("API keys enable advanced features:")
-                        .font(.headline)
-                    
                     VStack(alignment: .leading, spacing: 12) {
                         InfoRow(
+                            icon: "person.circle",
+                            title: "Account Login",
+                            description: "Create an account or login to enable AI features. Your requests are processed securely on our server using OpenAI.",
+                            link: "https://knowbest-backend.onrender.com"
+                        )
+                        
+                        InfoRow(
                             icon: "brain",
-                            title: "OpenAI API Key",
-                            description: "Enables advanced natural language understanding. Makes the assistant understand complex requests better.",
-                            link: "https://platform.openai.com/api-keys"
+                            title: "AI Powered",
+                            description: "When logged in, your voice commands are understood using GPT-4o-mini. No need for your own OpenAI key!",
+                            link: "https://openai.com"
                         )
                         
                         InfoRow(
                             icon: "waveform",
-                            title: "Eleven Labs API Key",
-                            description: "Provides natural, human-like voice responses instead of robotic system voice.",
+                            title: "Natural Voice (Optional)",
+                            description: "Add your own Eleven Labs key for natural voice responses. Free tier gives 10,000 chars/month.",
                             link: "https://elevenlabs.io/app/api-keys"
                         )
                     }
                     
                     Divider()
                     
-                    Text("Cost")
+                    Text("Privacy")
                         .font(.title3)
                         .fontWeight(.semibold)
                     
-                    Text("• OpenAI: Very affordable (~$1-5/month for personal use)")
-                    Text("• Eleven Labs: Free tier available (10,000 chars/month)")
+                    Text("• Your todos are stored locally on your device")
+                    Text("• Voice commands are processed securely")
+                    Text("• Eleven Labs key is stored only on your device")
                     
                     Divider()
                     
-                    Text("Security")
+                    Text("Without Login")
                         .font(.title3)
                         .fontWeight(.semibold)
                     
-                    Text("• Keys are stored securely on your device")
-                    Text("• Never shared with third parties")
-                    Text("• You can remove them anytime")
+                    Text("• Basic voice recognition still works")
+                    Text("• Simple commands like 'Remind me to...' are parsed locally")
+                    Text("• Login for better understanding of complex requests")
                     
                     Spacer()
                 }
                 .padding()
             }
-            .navigationTitle("API Keys Info")
+            .navigationTitle("How It Works")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

@@ -18,6 +18,7 @@ struct VoiceAssistantView: View {
     @State private var isProcessing = false
     @State private var assistantResponse = ""
     @State private var showAPIKeySettings = false
+    @State private var showLoginSheet = false
     
     var body: some View {
         NavigationStack {
@@ -108,7 +109,10 @@ struct VoiceAssistantView: View {
                 }
             }
             .sheet(isPresented: $showAPIKeySettings) {
-                APIKeySettingsView()
+                AccountSettingsView()
+            }
+            .sheet(isPresented: $showLoginSheet) {
+                AccountSettingsView()
             }
             .onAppear {
                 voiceManager.startListening()
@@ -199,12 +203,13 @@ struct VoiceAssistantView: View {
         
         Task {
             do {
-                // Try OpenAI first, fallback to AIService if no key
+                // Try Backend AI first (uses OpenAI on server), fallback to local AIService
                 let response: ParsedTodoResponse
-                if UserDefaults.standard.string(forKey: "OpenAIAPIKey")?.isEmpty == false {
-                    response = try await OpenAIService.shared.parseUserInput(text, conversationHistory: conversationHistory)
+                if BackendService.shared.isLoggedIn {
+                    // Use backend API - OpenAI key is secure on server
+                    response = try await BackendService.shared.parseWithAI(text, conversationHistory: conversationHistory)
                 } else {
-                    // Use AIService for rule-based parsing (Siri-like)
+                    // Use AIService for rule-based parsing (Siri-like fallback)
                     let parsedTodos = await AIService.shared.parseNaturalLanguage(text)
                     let todoItems = parsedTodos.map { todo in
                         ParsedTodoResponse.ParsedTodoItem(
@@ -255,34 +260,22 @@ struct VoiceAssistantView: View {
                         
                         // Process todos
                         if !response.todos.isEmpty {
-                            var responseText = "I've created \(response.todos.count) todo"
-                            if response.todos.count > 1 {
-                                responseText += "s"
-                            }
-                            responseText += " for you."
+                            // Use response from AI if available, otherwise generate our own
+                            var responseText = response.response ?? "I've created \(response.todos.count) todo\(response.todos.count > 1 ? "s" : "") for you."
                             
-                            for (index, todoData) in response.todos.enumerated() {
+                            for todoData in response.todos {
                                 let todo = createTodo(from: todoData)
                                 store.addTodo(todo)
                                 
-                                if let reminderDate = todo.reminderDate {
+                                if todo.reminderDate != nil {
                                     NotificationManager.shared.scheduleReminder(for: todo)
                                 }
                                 
-                                if let _ = todo.dueDate {
+                                if todo.dueDate != nil {
                                     Task {
                                         await CalendarManager.shared.addTodoToCalendar(todo)
                                     }
                                 }
-                                
-                                responseText += " \(index + 1). \(todo.title)"
-                                if let dueDate = todo.dueDate {
-                                    let formatter = DateFormatter()
-                                    formatter.dateStyle = .short
-                                    formatter.timeStyle = .short
-                                    responseText += " scheduled for \(formatter.string(from: dueDate))"
-                                }
-                                responseText += "."
                             }
                             
                             conversationHistory.append(responseText)
@@ -387,41 +380,109 @@ struct AssistantMessage: View {
     }
 }
 
-struct APIKeySettingsView: View {
+struct AccountSettingsView: View {
     @Environment(\.dismiss) var dismiss
-    @State private var openAIKey: String = UserDefaults.standard.string(forKey: "OpenAIAPIKey") ?? ""
+    @State private var email: String = ""
+    @State private var password: String = ""
+    @State private var name: String = ""
+    @State private var isRegistering = false
+    @State private var isLoading = false
+    @State private var errorMessage: String?
     @State private var elevenLabsKey: String = UserDefaults.standard.string(forKey: "ElevenLabsAPIKey") ?? ""
+    
+    var isLoggedIn: Bool {
+        BackendService.shared.isLoggedIn
+    }
     
     var body: some View {
         NavigationStack {
             Form {
-                Section("OpenAI API Key") {
-                    TextField("sk-...", text: $openAIKey)
-                        .textContentType(.password)
-                    Text("Required for advanced natural language understanding")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                if isLoggedIn {
+                    // Logged in state
+                    Section("Account") {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Logged in")
+                        }
+                        
+                        Button("Log Out", role: .destructive) {
+                            BackendService.shared.logout()
+                        }
+                    }
+                    
+                    Section("AI Features") {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("OpenAI enabled (via server)")
+                        }
+                        Text("Your OpenAI API key is securely stored on the server")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    // Login/Register form
+                    Section(isRegistering ? "Create Account" : "Login") {
+                        if isRegistering {
+                            TextField("Name", text: $name)
+                                .textContentType(.name)
+                        }
+                        
+                        TextField("Email", text: $email)
+                            .textContentType(.emailAddress)
+                            .autocapitalization(.none)
+                            .keyboardType(.emailAddress)
+                        
+                        SecureField("Password", text: $password)
+                            .textContentType(isRegistering ? .newPassword : .password)
+                        
+                        if let error = errorMessage {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                        
+                        Button {
+                            performAuth()
+                        } label: {
+                            if isLoading {
+                                ProgressView()
+                            } else {
+                                Text(isRegistering ? "Create Account" : "Login")
+                            }
+                        }
+                        .disabled(email.isEmpty || password.isEmpty || isLoading)
+                    }
+                    
+                    Section {
+                        Button(isRegistering ? "Already have an account? Login" : "Don't have an account? Register") {
+                            isRegistering.toggle()
+                            errorMessage = nil
+                        }
+                    }
+                    
+                    Section {
+                        Text("Login to enable advanced AI features with OpenAI")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 
-                Section("Eleven Labs API Key") {
-                    TextField("...", text: $elevenLabsKey)
+                Section("Voice Settings") {
+                    TextField("Eleven Labs API Key (optional)", text: $elevenLabsKey)
                         .textContentType(.password)
-                    Text("Required for natural voice synthesis. Falls back to system voice if not provided")
+                    Text("For natural voice. Falls back to system voice if not provided.")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                }
-                
-                Section {
-                    Link("Get OpenAI API Key", destination: URL(string: "https://platform.openai.com/api-keys")!)
-                    Link("Get Eleven Labs API Key", destination: URL(string: "https://elevenlabs.io/app/api-keys")!)
+                    Link("Get Eleven Labs Key", destination: URL(string: "https://elevenlabs.io/app/api-keys")!)
                 }
             }
-            .navigationTitle("API Settings")
+            .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        OpenAIService.shared.setAPIKey(openAIKey)
+                    Button("Done") {
                         ElevenLabsService.shared.setAPIKey(elevenLabsKey)
                         dismiss()
                     }
@@ -429,7 +490,34 @@ struct APIKeySettingsView: View {
             }
         }
     }
+    
+    private func performAuth() {
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                if isRegistering {
+                    _ = try await BackendService.shared.register(email: email, password: password, name: name)
+                } else {
+                    _ = try await BackendService.shared.login(email: email, password: password)
+                }
+                
+                await MainActor.run {
+                    isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    isLoading = false
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
 }
+
+// Keep old name for backwards compatibility
+typealias APIKeySettingsView = AccountSettingsView
 
 #Preview {
     VoiceAssistantView(store: TodoStore())
