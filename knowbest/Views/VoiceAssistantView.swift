@@ -161,7 +161,7 @@ struct VoiceAssistantView: View {
     // MARK: - Main Voice Assistant Content
     
     private var voiceAssistantContent: some View {
-        VStack(spacing: 0) {
+        return VStack(spacing: 0) {
             // Status indicator
             statusHeader
             
@@ -204,6 +204,7 @@ struct VoiceAssistantView: View {
                         }
                     }
                 }
+            }
             
             Divider()
             
