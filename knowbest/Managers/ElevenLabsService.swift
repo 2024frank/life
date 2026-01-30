@@ -83,6 +83,7 @@ class ElevenLabsService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
     
     private let baseURL = "https://api.elevenlabs.io/v1/text-to-speech"
+    private let streamURL = "https://api.elevenlabs.io/v1/text-to-speech"
     private let voiceID = "pNInz6obpgDQGcFmaJgB" // Adam voice
     
     private override init() {
@@ -113,8 +114,9 @@ class ElevenLabsService: NSObject, ObservableObject, AVAudioPlayerDelegate {
             
             let requestBody: [String: Any] = [
                 "text": text,
-                "model_id": "eleven_multilingual_v2",  // Better emotion support
-                "voice_settings": emotion.voiceSettings
+                "model_id": "eleven_turbo_v2_5",  // Fastest model with good quality
+                "voice_settings": emotion.voiceSettings,
+                "optimize_streaming_latency": 4  // Maximum optimization
             ]
             
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
