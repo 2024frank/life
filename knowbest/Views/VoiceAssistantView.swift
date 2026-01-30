@@ -204,31 +204,29 @@ struct VoiceAssistantView: View {
                         }
                     }
                 }
-            }
-                
-                Divider()
-                
-                // Voice activation area
-                VStack(spacing: 16) {
-                    if voiceManager.isActivated {
-                        activatedState
-                    } else {
-                        waitingState
-                    }
-                    
-                    // Recognized text display
-                    if !voiceManager.recognizedText.isEmpty {
-                        Text("\"\(voiceManager.recognizedText)\"")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .italic()
-                            .padding(.horizontal)
-                    }
+            
+            Divider()
+            
+            // Voice activation area
+            VStack(spacing: 16) {
+                if voiceManager.isActivated {
+                    activatedState
+                } else {
+                    waitingState
                 }
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color(.systemGray6))
+                
+                // Recognized text display
+                if !voiceManager.recognizedText.isEmpty {
+                    Text("\"\(voiceManager.recognizedText)\"")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .italic()
+                        .padding(.horizontal)
+                }
             }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(Color(.systemGray6))
         }
         .onAppear {
             if voiceManager.permissionStatus == .authorized {
