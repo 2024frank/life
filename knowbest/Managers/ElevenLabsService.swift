@@ -136,7 +136,7 @@ class ElevenLabsService: NSObject, ObservableObject, AVAudioPlayerDelegate {
             await MainActor.run {
                 do {
                     // Configure audio session for playback
-                    try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenContent)
+                    try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
                     try AVAudioSession.sharedInstance().setActive(true)
                     
                     audioPlayer = try AVAudioPlayer(contentsOf: tempURL)
