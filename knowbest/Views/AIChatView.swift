@@ -13,12 +13,25 @@ struct AIChatView: View {
     @State private var messageText: String = ""
     @State private var messages: [ChatMessage] = []
     @State private var isProcessing: Bool = false
+    @State private var pendingTodos: [PendingTodo] = []
+    @State private var showingPreview: Bool = false
     
     struct ChatMessage: Identifiable {
         let id = UUID()
         let text: String
         let isUser: Bool
         let timestamp: Date
+        var isPreview: Bool = false
+    }
+    
+    struct PendingTodo: Identifiable {
+        let id = UUID()
+        var title: String
+        var description: String
+        var dueDate: Date?
+        var reminderDate: Date?
+        var priority: Priority
+        var category: String
     }
     
     var body: some View {
@@ -41,11 +54,16 @@ struct AIChatView: View {
                                 HStack {
                                     ProgressView()
                                         .scaleEffect(0.8)
-                                    Text("Processing...")
+                                    Text("Adam is thinking...")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
                                 .padding()
+                            }
+                            
+                            // Preview card for pending todos
+                            if !pendingTodos.isEmpty {
+                                todoPreviewCard
                             }
                         }
                         .padding()
@@ -63,7 +81,7 @@ struct AIChatView: View {
                 
                 // Input area
                 HStack(spacing: 12) {
-                    TextField("Type your tasks...", text: $messageText, axis: .vertical)
+                    TextField("Tell Adam what you need to do...", text: $messageText, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
                         .lineLimit(1...4)
                         .onSubmit {
@@ -82,7 +100,7 @@ struct AIChatView: View {
                 .padding()
                 .background(Color(.systemBackground))
             }
-            .navigationTitle("AI Assistant")
+            .navigationTitle("Chat with Adam")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -98,18 +116,100 @@ struct AIChatView: View {
         VStack(spacing: 16) {
             Image(systemName: "sparkles")
                 .font(.system(size: 50))
-                .foregroundColor(.blue)
-            Text("AI Todo Assistant")
+                .foregroundColor(.purple)
+            Text("Chat with Adam")
                 .font(.title2)
                 .fontWeight(.bold)
-            Text("Tell me what you need to do, and I'll create todos for you!\n\nExamples:\n• \"Call dentist tomorrow at 2pm\"\n• \"Buy groceries today at 5pm\"\n• \"Finish project report urgent\"")
+            Text("Just type what you need to do - I'll clean it up and show you a preview before adding!\n\nExamples:\n• \"rmind me call mom tmrw 3pm\"\n• \"buy milk urgent\"\n• \"meeting with john next monday at 10\"")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding()
+            
+            if !BackendService.shared.isLoggedIn {
+                HStack {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(.orange)
+                    Text("Log in for smarter AI")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
+    }
+    
+    private var todoPreviewCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "sparkles")
+                    .foregroundColor(.purple)
+                Text("Here's what I understood:")
+                    .font(.headline)
+                Spacer()
+            }
+            
+            ForEach($pendingTodos) { $todo in
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("Task", text: $todo.title)
+                        .font(.body.bold())
+                        .textFieldStyle(.roundedBorder)
+                    
+                    HStack {
+                        if let dueDate = todo.dueDate {
+                            Label(formatDate(dueDate), systemImage: "calendar")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        }
+                        
+                        Label(todo.priority.rawValue, systemImage: "flag.fill")
+                            .font(.caption)
+                            .foregroundColor(priorityColor(todo.priority))
+                        
+                        Label(todo.category, systemImage: "folder")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+            }
+            
+            HStack(spacing: 12) {
+                Button {
+                    pendingTodos.removeAll()
+                    let response = ChatMessage(text: "No problem! What else can I help you with?", isUser: false, timestamp: Date())
+                    messages.append(response)
+                } label: {
+                    Text("Cancel")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color(.systemGray5))
+                        .foregroundColor(.primary)
+                        .cornerRadius(10)
+                }
+                
+                Button {
+                    confirmTodos()
+                } label: {
+                    HStack {
+                        Image(systemName: "checkmark")
+                        Text("Add \(pendingTodos.count) Task\(pendingTodos.count > 1 ? "s" : "")")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 5, y: 2)
     }
     
     private func sendMessage() {
@@ -124,63 +224,147 @@ struct AIChatView: View {
         
         // Process with AI
         Task {
-            let parsedTodos = await AIService.shared.parseNaturalLanguage(text)
-            
-            await MainActor.run {
-                isProcessing = false
+            do {
+                let response: ParsedTodoResponse
                 
-                if parsedTodos.isEmpty {
-                    let response = ChatMessage(
-                        text: "I couldn't parse any todos from that. Try something like 'Call dentist tomorrow at 2pm' or 'Buy groceries today'",
-                        isUser: false,
-                        timestamp: Date()
-                    )
-                    messages.append(response)
+                // Use backend AI if logged in, otherwise fallback to local
+                if BackendService.shared.isLoggedIn {
+                    response = try await BackendService.shared.parseWithAI(text)
                 } else {
-                    var responseText = "I've created \(parsedTodos.count) todo(s) for you:\n\n"
-                    for (index, todo) in parsedTodos.enumerated() {
-                        responseText += "\(index + 1). \(todo.title)"
-                        if let dueDate = todo.dueDate {
-                            let formatter = DateFormatter()
-                            formatter.dateStyle = .short
-                            formatter.timeStyle = .short
-                            responseText += " - \(formatter.string(from: dueDate))"
-                        }
-                        responseText += "\n"
-                    }
-                    
-                    let response = ChatMessage(text: responseText, isUser: false, timestamp: Date())
-                    messages.append(response)
-                    
-                    // Add todos to store
-                    for parsedTodo in parsedTodos {
-                        let todo = TodoItem(
-                            title: parsedTodo.title,
-                            description: parsedTodo.description,
-                            isCompleted: false,
-                            priority: parsedTodo.priority,
-                            dueDate: parsedTodo.dueDate,
-                            reminderDate: parsedTodo.reminderDate,
-                            category: parsedTodo.category,
-                            createdAt: Date()
+                    // Local fallback
+                    let parsedTodos = await AIService.shared.parseNaturalLanguage(text)
+                    let todoItems = parsedTodos.map { todo in
+                        ParsedTodoResponse.ParsedTodoItem(
+                            title: todo.title,
+                            description: todo.description.isEmpty ? nil : todo.description,
+                            dueDate: todo.dueDate?.ISO8601Format(),
+                            reminderDate: todo.reminderDate?.ISO8601Format(),
+                            priority: todo.priority.rawValue.lowercased(),
+                            category: todo.category,
+                            isRecurring: nil,
+                            recurrencePattern: nil
                         )
-                        
-                        store.addTodo(todo)
-                        
-                        // Schedule notification
-                        if let reminderDate = todo.reminderDate {
-                            NotificationManager.shared.scheduleReminder(for: todo)
-                        }
-                        
-                        // Add to calendar if due date exists
-                        if let _ = todo.dueDate {
-                            Task {
-                                await CalendarManager.shared.addTodoToCalendar(todo)
-                            }
+                    }
+                    response = ParsedTodoResponse(
+                        todos: todoItems,
+                        questions: nil,
+                        needsClarification: false,
+                        response: nil
+                    )
+                }
+                
+                await MainActor.run {
+                    isProcessing = false
+                    
+                    if response.todos.isEmpty {
+                        let aiResponse = ChatMessage(
+                            text: response.response ?? "I couldn't understand that. Try something like 'Call mom tomorrow at 3pm'",
+                            isUser: false,
+                            timestamp: Date()
+                        )
+                        messages.append(aiResponse)
+                    } else {
+                        // Convert to pending todos for preview
+                        pendingTodos = response.todos.map { item in
+                            PendingTodo(
+                                title: cleanupTitle(item.title),
+                                description: item.description ?? "",
+                                dueDate: item.dueDate?.fromISO8601(),
+                                reminderDate: item.reminderDate?.fromISO8601(),
+                                priority: parsePriority(item.priority),
+                                category: item.category ?? "General"
+                            )
                         }
                     }
                 }
+            } catch {
+                await MainActor.run {
+                    isProcessing = false
+                    let errorMessage = ChatMessage(
+                        text: "Sorry, I had trouble understanding that. Try again?",
+                        isUser: false,
+                        timestamp: Date()
+                    )
+                    messages.append(errorMessage)
+                }
             }
+        }
+    }
+    
+    private func confirmTodos() {
+        var addedTitles: [String] = []
+        
+        for pending in pendingTodos {
+            let todo = TodoItem(
+                title: pending.title,
+                description: pending.description,
+                isCompleted: false,
+                priority: pending.priority,
+                dueDate: pending.dueDate,
+                reminderDate: pending.reminderDate,
+                category: pending.category,
+                createdAt: Date()
+            )
+            
+            store.addTodo(todo)
+            addedTitles.append(pending.title)
+            
+            // Schedule notification
+            if todo.reminderDate != nil {
+                NotificationManager.shared.scheduleReminder(for: todo)
+            }
+            
+            // Add to calendar
+            if todo.dueDate != nil {
+                Task {
+                    await CalendarManager.shared.addTodoToCalendar(todo)
+                }
+            }
+        }
+        
+        // Confirmation message
+        let confirmText = addedTitles.count == 1 
+            ? "Done! I've added \"\(addedTitles[0])\" to your list."
+            : "Done! I've added \(addedTitles.count) tasks to your list."
+        
+        let confirmMessage = ChatMessage(text: confirmText, isUser: false, timestamp: Date())
+        messages.append(confirmMessage)
+        
+        pendingTodos.removeAll()
+    }
+    
+    private func cleanupTitle(_ title: String) -> String {
+        // Capitalize first letter, clean up common issues
+        var cleaned = title.trimmingCharacters(in: .whitespaces)
+        if let first = cleaned.first {
+            cleaned = first.uppercased() + cleaned.dropFirst()
+        }
+        return cleaned
+    }
+    
+    private func parsePriority(_ priority: String?) -> Priority {
+        guard let p = priority?.lowercased() else { return .medium }
+        switch p {
+        case "urgent": return .urgent
+        case "high": return .high
+        case "low": return .low
+        default: return .medium
+        }
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+    
+    private func priorityColor(_ priority: Priority) -> Color {
+        switch priority {
+        case .urgent: return .red
+        case .high: return .orange
+        case .medium: return .blue
+        case .low: return .gray
         }
     }
 }
