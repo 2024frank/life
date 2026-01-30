@@ -85,6 +85,9 @@ struct OnboardingView: View {
                 } else {
                     Button {
                         isRequesting = true
+                        // Check current permissions first (safe - won't crash)
+                        permissionManager.checkAllPermissions()
+                        // Then request if needed
                         permissionManager.requestAllPermissions {
                             isRequesting = false
                         }

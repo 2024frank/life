@@ -32,25 +32,19 @@ class PermissionManager: ObservableObject {
     }
     
     private init() {
-        checkAllPermissions()
+        // Don't check permissions on init - wait until user needs them
+        // This prevents crash if Info.plist keys are missing
     }
     
     func checkAllPermissions() {
-        // Check microphone
-        switch AVAudioSession.sharedInstance().recordPermission {
-        case .granted:
-            microphoneGranted = true
-        default:
-            microphoneGranted = false
-        }
+        // Check microphone - only check if Info.plist has the key
+        // If key is missing, this will return .undetermined without crashing
+        let micStatus = AVAudioSession.sharedInstance().recordPermission
+        microphoneGranted = (micStatus == .granted)
         
         // Check speech recognition
-        switch SFSpeechRecognizer.authorizationStatus() {
-        case .authorized:
-            speechGranted = true
-        default:
-            speechGranted = false
-        }
+        let speechStatus = SFSpeechRecognizer.authorizationStatus()
+        speechGranted = (speechStatus == .authorized)
         
         // Check notifications
         UNUserNotificationCenter.current().getNotificationSettings { settings in
