@@ -18,49 +18,49 @@ enum VoiceEmotion: String {
     case understanding = "understanding"
     case neutral = "neutral"
     
-    // Voice settings for each emotion
+    // Voice settings for each emotion - balanced pace
     var voiceSettings: [String: Any] {
         switch self {
         case .happy:
             return [
-                "stability": 0.3,           // Lower = more expressive
-                "similarity_boost": 0.75,
-                "style": 0.8,               // High style = more emotional
+                "stability": 0.5,           // More stable = slower pace
+                "similarity_boost": 0.8,
+                "style": 0.6,               // Moderate expression
                 "use_speaker_boost": true
             ]
         case .encouraging:
             return [
-                "stability": 0.4,
+                "stability": 0.55,
                 "similarity_boost": 0.8,
-                "style": 0.6,
+                "style": 0.5,
                 "use_speaker_boost": true
             ]
         case .calm:
             return [
-                "stability": 0.7,           // Higher = more stable/calm
+                "stability": 0.75,          // High stability = measured pace
                 "similarity_boost": 0.85,
-                "style": 0.3,               // Lower style = more subdued
+                "style": 0.3,
                 "use_speaker_boost": true
             ]
         case .excited:
             return [
-                "stability": 0.25,          // Very expressive
-                "similarity_boost": 0.7,
-                "style": 0.9,               // Maximum emotion
+                "stability": 0.45,          // Slightly faster but controlled
+                "similarity_boost": 0.75,
+                "style": 0.7,
                 "use_speaker_boost": true
             ]
         case .understanding:
             return [
-                "stability": 0.55,
+                "stability": 0.65,          // Calm, measured
                 "similarity_boost": 0.8,
-                "style": 0.4,               // Gentle, warm
+                "style": 0.35,
                 "use_speaker_boost": true
             ]
         case .neutral:
             return [
-                "stability": 0.5,
-                "similarity_boost": 0.75,
-                "style": 0.5,
+                "stability": 0.6,           // Balanced, natural pace
+                "similarity_boost": 0.8,
+                "style": 0.4,
                 "use_speaker_boost": true
             ]
         }
@@ -114,9 +114,8 @@ class ElevenLabsService: NSObject, ObservableObject, AVAudioPlayerDelegate {
             
             let requestBody: [String: Any] = [
                 "text": text,
-                "model_id": "eleven_turbo_v2_5",  // Fastest model with good quality
-                "voice_settings": emotion.voiceSettings,
-                "optimize_streaming_latency": 4  // Maximum optimization
+                "model_id": "eleven_turbo_v2_5",
+                "voice_settings": emotion.voiceSettings
             ]
             
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
