@@ -10,8 +10,8 @@ import SwiftUI
 struct VoiceAssistantView: View {
     @ObservedObject var store: TodoStore
     @Environment(\.dismiss) var dismiss
-    @StateObject private var voiceManager = VoiceActivationManager.shared
-    @StateObject private var elevenLabs = ElevenLabsService.shared
+    @ObservedObject private var voiceManager = VoiceActivationManager.shared
+    @ObservedObject private var elevenLabs = ElevenLabsService.shared
     
     @State private var conversationHistory: [String] = []
     @State private var currentQuestion: String?

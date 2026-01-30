@@ -6,10 +6,13 @@
 //
 
 import Foundation
+import Combine
 import AVFoundation
 
 class ElevenLabsService: NSObject, ObservableObject {
     static let shared = ElevenLabsService()
+    
+    @Published var isSpeaking = false
     
     private var audioPlayer: AVAudioPlayer?
     private var apiKey: String {
@@ -71,9 +74,11 @@ class ElevenLabsService: NSObject, ObservableObject {
             await MainActor.run {
                 do {
                     audioPlayer = try AVAudioPlayer(contentsOf: tempURL)
+                    isSpeaking = true
                     audioPlayer?.play()
                 } catch {
                     print("Error playing audio: \(error.localizedDescription)")
+                    isSpeaking = false
                 }
             }
             
@@ -95,5 +100,6 @@ class ElevenLabsService: NSObject, ObservableObject {
     
     func stopSpeaking() {
         audioPlayer?.stop()
+        isSpeaking = false
     }
 }
