@@ -23,7 +23,7 @@ class ElevenLabsService: NSObject, ObservableObject {
     }
     
     private let baseURL = "https://api.elevenlabs.io/v1/text-to-speech"
-    private let voiceID = "21m00Tcm4TlvDq8ikWAM" // Default voice (Rachel)
+    private let voiceID = "pNInz6obpgDQGcFmaJgB" // Adam voice
     
     private override init() {
         super.init()
