@@ -215,8 +215,6 @@ struct AIChatView: View {
         // Process with AI
         Task {
             do {
-                let response: ParsedTodoResponse
-                
                 // Use local AI parsing
                 let parsedTodos = await AIService.shared.parseNaturalLanguage(text)
                 let todoItems = parsedTodos.map { todo in
