@@ -141,15 +141,13 @@ class AIService {
         let calendar = Calendar.current
         var components = calendar.dateComponents([.year, .month, .day], from: baseDate)
         
-        if match.numberOfRanges > 1 {
-            let hourRange = Range(match.range(at: 1), in: text)!
+        if match.numberOfRanges > 1, let hourRange = Range(match.range(at: 1), in: text) {
             if let hour = Int(text[hourRange]) {
                 components.hour = hour
             }
         }
         
-        if match.numberOfRanges > 2 {
-            let minuteRange = Range(match.range(at: 2), in: text)!
+        if match.numberOfRanges > 2, let minuteRange = Range(match.range(at: 2), in: text) {
             if let minute = Int(text[minuteRange]) {
                 components.minute = minute
             } else {
@@ -157,8 +155,7 @@ class AIService {
             }
         }
         
-        if match.numberOfRanges > 3 {
-            let amPmRange = Range(match.range(at: 3), in: text)!
+        if match.numberOfRanges > 3, let amPmRange = Range(match.range(at: 3), in: text) {
             let amPm = String(text[amPmRange]).lowercased()
             if amPm == "pm" && components.hour ?? 0 < 12 {
                 components.hour = (components.hour ?? 0) + 12

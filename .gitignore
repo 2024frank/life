@@ -96,6 +96,12 @@ backend/data/
 backend/*.log
 backend/.DS_Store
 
+# API Keys - NEVER commit these!
+APIKeys.plist
+APIKeys.swift
+*.apikeys
+*.secrets
+
 # macOS
 .DS_Store
 .AppleDouble

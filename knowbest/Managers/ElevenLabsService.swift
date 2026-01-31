@@ -76,10 +76,19 @@ class ElevenLabsService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var systemSynthesizer: AVSpeechSynthesizer?
     
     private var apiKey: String {
+        // 1. Check UserDefaults (set in app)
         if let key = UserDefaults.standard.string(forKey: "ElevenLabsAPIKey"), !key.isEmpty {
             return key
         }
-        return ProcessInfo.processInfo.environment["ELEVENLABS_API_KEY"] ?? ""
+        // 2. Check environment variable (from build settings)
+        if let key = ProcessInfo.processInfo.environment["ELEVENLABS_API_KEY"], !key.isEmpty {
+            return key
+        }
+        // 3. Check Info.plist (from build settings)
+        if let key = Bundle.main.object(forInfoDictionaryKey: "ELEVENLABS_API_KEY") as? String, !key.isEmpty {
+            return key
+        }
+        return ""
     }
     
     private let baseURL = "https://api.elevenlabs.io/v1/text-to-speech"
