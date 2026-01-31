@@ -375,10 +375,10 @@ struct TodoRowView: View {
                         // Priority badge
                         Label(todo.priority.rawValue, systemImage: todo.priority.icon)
                             .font(.caption)
-                            .foregroundColor(Color(todo.priority.color))
+                            .foregroundColor(todo.priority.swiftUIColor)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Color(todo.priority.color).opacity(0.2))
+                            .background(todo.priority.swiftUIColor.opacity(0.2))
                             .cornerRadius(8)
                         
                         // Category

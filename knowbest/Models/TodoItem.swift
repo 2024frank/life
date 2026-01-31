@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 struct TodoItem: Identifiable, Codable, Hashable {
     var id: UUID
@@ -84,6 +85,15 @@ enum Priority: String, Codable, CaseIterable {
         case .medium: return "orange"
         case .high: return "red"
         case .urgent: return "purple"
+        }
+    }
+    
+    var swiftUIColor: Color {
+        switch self {
+        case .low: return .blue
+        case .medium: return .orange
+        case .high: return .red
+        case .urgent: return .purple
         }
     }
     
