@@ -34,27 +34,28 @@ struct SettingsView: View {
                     }
                 }
                 
-                // Account Section
-                Section("Account") {
+                // Account Section - OPTIONAL for cloud sync only
+                Section("Cloud Sync (Optional)") {
                     if isLoggedIn {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
-                            Text("Logged in")
+                            Text("Cloud sync enabled")
                         }
                         
-                        HStack {
-                            Image(systemName: "brain")
-                                .foregroundColor(.purple)
-                            Text("AI powered by OpenAI (GPT-4o-mini)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                        Text("Your todos sync across devices")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         
                         Button("Log Out", role: .destructive) {
                             BackendService.shared.logout()
                         }
                     } else {
+                        Text("Login is OPTIONAL - only needed if you want to sync todos across devices.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.vertical, 4)
+                        
                         if isRegistering {
                             TextField("Name", text: $name)
                                 .textContentType(.name)
@@ -92,15 +93,19 @@ struct SettingsView: View {
                             errorMessage = nil
                         }
                         .font(.caption)
-                        
-                        HStack {
-                            Image(systemName: "exclamationmark.triangle")
-                                .foregroundColor(.orange)
-                            Text("Login for advanced AI features")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
                     }
+                }
+                
+                Section("AI Features") {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.purple)
+                        Text("Adam works perfectly without login!")
+                            .font(.subheadline)
+                    }
+                    Text("All AI features work locally on your device. Login is only for cloud sync.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
                 Section("Voice (Eleven Labs)") {

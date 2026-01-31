@@ -288,17 +288,6 @@ struct VoiceAssistantView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-            
-            if !BackendService.shared.isLoggedIn {
-                HStack {
-                    Image(systemName: "info.circle")
-                        .foregroundColor(.orange)
-                    Text("Log in for smarter AI")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                }
-                .padding(.top, 8)
-            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
@@ -552,19 +541,19 @@ struct AccountSettingsView: View {
                         }
                     }
                     
-                    Section("AI Features") {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("OpenAI enabled (via server)")
-                        }
-                        Text("Your OpenAI API key is securely stored on the server")
+                    Section("Cloud Sync") {
+                        Text("Your todos sync across devices")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                 } else {
-                    // Login/Register form
-                    Section(isRegistering ? "Create Account" : "Login") {
+                    // Login/Register form - OPTIONAL
+                    Section("Cloud Sync (Optional)") {
+                        Text("Login is OPTIONAL - only for syncing todos across devices. Adam works perfectly without it!")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.vertical, 4)
+                        
                         if isRegistering {
                             TextField("Name", text: $name)
                                 .textContentType(.name)
@@ -602,12 +591,18 @@ struct AccountSettingsView: View {
                             errorMessage = nil
                         }
                     }
-                    
-                    Section {
-                        Text("Login to enable advanced AI features with OpenAI")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                }
+                
+                Section("AI Features") {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.purple)
+                        Text("Adam works perfectly without login!")
+                            .font(.subheadline)
                     }
+                    Text("All AI features work locally. Login is only for cloud sync.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
                 Section("Voice Settings") {

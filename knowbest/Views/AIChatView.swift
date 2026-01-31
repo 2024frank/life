@@ -125,16 +125,6 @@ struct AIChatView: View {
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding()
-            
-            if !BackendService.shared.isLoggedIn {
-                HStack {
-                    Image(systemName: "info.circle")
-                        .foregroundColor(.orange)
-                    Text("Log in for smarter AI")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                }
-            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
