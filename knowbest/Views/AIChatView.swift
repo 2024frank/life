@@ -217,31 +217,26 @@ struct AIChatView: View {
             do {
                 let response: ParsedTodoResponse
                 
-                // Use backend AI if logged in, otherwise fallback to local
-                if BackendService.shared.isLoggedIn {
-                    response = try await BackendService.shared.parseWithAI(text)
-                } else {
-                    // Local fallback
-                    let parsedTodos = await AIService.shared.parseNaturalLanguage(text)
-                    let todoItems = parsedTodos.map { todo in
-                        ParsedTodoResponse.ParsedTodoItem(
-                            title: todo.title,
-                            description: todo.description.isEmpty ? nil : todo.description,
-                            dueDate: todo.dueDate?.ISO8601Format(),
-                            reminderDate: todo.reminderDate?.ISO8601Format(),
-                            priority: todo.priority.rawValue.lowercased(),
-                            category: todo.category,
-                            isRecurring: nil,
-                            recurrencePattern: nil
-                        )
-                    }
-                    response = ParsedTodoResponse(
-                        todos: todoItems,
-                        questions: nil,
-                        needsClarification: false,
-                        response: nil
+                // Use local AI parsing
+                let parsedTodos = await AIService.shared.parseNaturalLanguage(text)
+                let todoItems = parsedTodos.map { todo in
+                    ParsedTodoResponse.ParsedTodoItem(
+                        title: todo.title,
+                        description: todo.description.isEmpty ? nil : todo.description,
+                        dueDate: todo.dueDate?.ISO8601Format(),
+                        reminderDate: todo.reminderDate?.ISO8601Format(),
+                        priority: todo.priority.rawValue.lowercased(),
+                        category: todo.category,
+                        isRecurring: nil,
+                        recurrencePattern: nil
                     )
                 }
+                let response = ParsedTodoResponse(
+                    todos: todoItems,
+                    questions: nil,
+                    needsClarification: false,
+                    response: nil
+                )
                 
                 await MainActor.run {
                     isProcessing = false

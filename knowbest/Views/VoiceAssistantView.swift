@@ -18,7 +18,6 @@ struct VoiceAssistantView: View {
     @State private var isProcessing = false
     @State private var assistantResponse = ""
     @State private var showAPIKeySettings = false
-    @State private var showLoginSheet = false
     @State private var isRequestingPermission = false
     
     var body: some View {
@@ -53,9 +52,6 @@ struct VoiceAssistantView: View {
                 }
             }
             .sheet(isPresented: $showAPIKeySettings) {
-                AccountSettingsView()
-            }
-            .sheet(isPresented: $showLoginSheet) {
                 AccountSettingsView()
             }
         }
@@ -328,45 +324,38 @@ struct VoiceAssistantView: View {
         
         Task {
             do {
-                // Try Backend AI first (uses OpenAI on server), fallback to local AIService
-                let response: ParsedTodoResponse
-                if BackendService.shared.isLoggedIn {
-                    // Use backend API - OpenAI key is secure on server
-                    response = try await BackendService.shared.parseWithAI(text, conversationHistory: conversationHistory)
-                } else {
-                    // Use AIService for rule-based parsing (Siri-like fallback)
-                    let parsedTodos = await AIService.shared.parseNaturalLanguage(text)
-                    let todoItems = parsedTodos.map { todo in
-                        ParsedTodoResponse.ParsedTodoItem(
-                            title: todo.title,
-                            description: todo.description.isEmpty ? nil : todo.description,
-                            dueDate: todo.dueDate?.ISO8601Format(),
-                            reminderDate: todo.reminderDate?.ISO8601Format(),
-                            priority: todo.priority.rawValue.lowercased(),
-                            category: todo.category,
-                            isRecurring: nil,
-                            recurrencePattern: nil
-                        )
-                    }
-                    
-                    // Check if we need clarification
-                    var questions: [String]? = nil
-                    let needsClarification = todoItems.isEmpty || (todoItems.first?.dueDate == nil && text.lowercased().contains("remind"))
-                    
-                    if needsClarification {
-                        if todoItems.isEmpty {
-                            questions = ["I didn't catch that. Could you say it again? For example, 'Remind me to call the dentist tomorrow at 2pm'."]
-                        } else if todoItems.first?.dueDate == nil {
-                            questions = ["When would you like to be reminded about this?"]
-                        }
-                    }
-                    
-                    response = ParsedTodoResponse(
-                        todos: todoItems,
-                        questions: questions,
-                        needsClarification: needsClarification
+                // Use local AIService for parsing
+                let parsedTodos = await AIService.shared.parseNaturalLanguage(text)
+                let todoItems = parsedTodos.map { todo in
+                    ParsedTodoResponse.ParsedTodoItem(
+                        title: todo.title,
+                        description: todo.description.isEmpty ? nil : todo.description,
+                        dueDate: todo.dueDate?.ISO8601Format(),
+                        reminderDate: todo.reminderDate?.ISO8601Format(),
+                        priority: todo.priority.rawValue.lowercased(),
+                        category: todo.category,
+                        isRecurring: nil,
+                        recurrencePattern: nil
                     )
                 }
+                
+                // Check if we need clarification
+                var questions: [String]? = nil
+                let needsClarification = todoItems.isEmpty || (todoItems.first?.dueDate == nil && text.lowercased().contains("remind"))
+                
+                if needsClarification {
+                    if todoItems.isEmpty {
+                        questions = ["I didn't catch that. Could you say it again? For example, 'Remind me to call the dentist tomorrow at 2pm'."]
+                    } else if todoItems.first?.dueDate == nil {
+                        questions = ["When would you like to be reminded about this?"]
+                    }
+                }
+                
+                let response = ParsedTodoResponse(
+                    todos: todoItems,
+                    questions: questions,
+                    needsClarification: needsClarification
+                )
                 
                 await MainActor.run {
                     isProcessing = false
@@ -530,99 +519,11 @@ struct AssistantMessage: View {
 
 struct AccountSettingsView: View {
     @Environment(\.dismiss) var dismiss
-    @State private var email: String = ""
-    @State private var password: String = ""
-    @State private var name: String = ""
-    @State private var isRegistering = false
-    @State private var isLoading = false
-    @State private var errorMessage: String?
     @State private var elevenLabsKey: String = UserDefaults.standard.string(forKey: "ElevenLabsAPIKey") ?? ""
-    
-    var isLoggedIn: Bool {
-        BackendService.shared.isLoggedIn
-    }
     
     var body: some View {
         NavigationStack {
             Form {
-                if isLoggedIn {
-                    // Logged in state
-                    Section("Account") {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Logged in")
-                        }
-                        
-                        Button("Log Out", role: .destructive) {
-                            BackendService.shared.logout()
-                        }
-                    }
-                    
-                    Section("Cloud Sync") {
-                        Text("Your todos sync across devices")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    // Login/Register form - OPTIONAL
-                    Section("Cloud Sync (Optional)") {
-                        Text("Login is OPTIONAL - only for syncing todos across devices. Adam works perfectly without it!")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.vertical, 4)
-                        
-                        if isRegistering {
-                            TextField("Name", text: $name)
-                                .textContentType(.name)
-                        }
-                        
-                        TextField("Email", text: $email)
-                            .textContentType(.emailAddress)
-                            .autocapitalization(.none)
-                            .keyboardType(.emailAddress)
-                        
-                        SecureField("Password", text: $password)
-                            .textContentType(isRegistering ? .newPassword : .password)
-                        
-                        if let error = errorMessage {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                        }
-                        
-                        Button {
-                            performAuth()
-                        } label: {
-                            if isLoading {
-                                ProgressView()
-                            } else {
-                                Text(isRegistering ? "Create Account" : "Login")
-                            }
-                        }
-                        .disabled(email.isEmpty || password.isEmpty || isLoading)
-                    }
-                    
-                    Section {
-                        Button(isRegistering ? "Already have an account? Login" : "Don't have an account? Register") {
-                            isRegistering.toggle()
-                            errorMessage = nil
-                        }
-                    }
-                }
-                
-                Section("AI Features") {
-                    HStack {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(.purple)
-                        Text("Adam works perfectly without login!")
-                            .font(.subheadline)
-                    }
-                    Text("All AI features work locally. Login is only for cloud sync.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
                 Section("Voice Settings") {
                     TextField("Eleven Labs API Key (optional)", text: $elevenLabsKey)
                         .textContentType(.password)
@@ -640,30 +541,6 @@ struct AccountSettingsView: View {
                         ElevenLabsService.shared.setAPIKey(elevenLabsKey)
                         dismiss()
                     }
-                }
-            }
-        }
-    }
-    
-    private func performAuth() {
-        isLoading = true
-        errorMessage = nil
-        
-        Task {
-            do {
-                if isRegistering {
-                    _ = try await BackendService.shared.register(email: email, password: password, name: name)
-                } else {
-                    _ = try await BackendService.shared.login(email: email, password: password)
-                }
-                
-                await MainActor.run {
-                    isLoading = false
-                }
-            } catch {
-                await MainActor.run {
-                    isLoading = false
-                    errorMessage = error.localizedDescription
                 }
             }
         }

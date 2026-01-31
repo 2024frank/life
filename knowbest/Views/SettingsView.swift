@@ -11,16 +11,6 @@ struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
     @State private var elevenLabsKey: String = UserDefaults.standard.string(forKey: "ElevenLabsAPIKey") ?? ""
     @State private var showAPIKeyInfo = false
-    @State private var email: String = ""
-    @State private var password: String = ""
-    @State private var name: String = ""
-    @State private var isRegistering = false
-    @State private var isLoading = false
-    @State private var errorMessage: String?
-    
-    var isLoggedIn: Bool {
-        BackendService.shared.isLoggedIn
-    }
     
     var body: some View {
         NavigationStack {
@@ -28,84 +18,10 @@ struct SettingsView: View {
                 Section {
                     HStack {
                         Image(systemName: "sparkles")
-                            .foregroundColor(.blue)
-                        Text("KnowBest Assistant")
+                            .foregroundColor(.purple)
+                        Text("Adam - Your Personal Assistant")
                             .font(.headline)
                     }
-                }
-                
-                // Account Section - OPTIONAL for cloud sync only
-                Section("Cloud Sync (Optional)") {
-                    if isLoggedIn {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Cloud sync enabled")
-                        }
-                        
-                        Text("Your todos sync across devices")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        Button("Log Out", role: .destructive) {
-                            BackendService.shared.logout()
-                        }
-                    } else {
-                        Text("Login is OPTIONAL - only needed if you want to sync todos across devices.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.vertical, 4)
-                        
-                        if isRegistering {
-                            TextField("Name", text: $name)
-                                .textContentType(.name)
-                        }
-                        
-                        TextField("Email", text: $email)
-                            .textContentType(.emailAddress)
-                            .autocapitalization(.none)
-                            .keyboardType(.emailAddress)
-                        
-                        SecureField("Password", text: $password)
-                            .textContentType(isRegistering ? .newPassword : .password)
-                        
-                        if let error = errorMessage {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                        }
-                        
-                        Button {
-                            performAuth()
-                        } label: {
-                            HStack {
-                                if isLoading {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                }
-                                Text(isRegistering ? "Create Account" : "Login")
-                            }
-                        }
-                        .disabled(email.isEmpty || password.isEmpty || isLoading)
-                        
-                        Button(isRegistering ? "Already have an account? Login" : "Don't have an account? Register") {
-                            isRegistering.toggle()
-                            errorMessage = nil
-                        }
-                        .font(.caption)
-                    }
-                }
-                
-                Section("AI Features") {
-                    HStack {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(.purple)
-                        Text("Adam works perfectly without login!")
-                            .font(.subheadline)
-                    }
-                    Text("All AI features work locally on your device. Login is only for cloud sync.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
                 }
                 
                 Section("Voice (Eleven Labs)") {
@@ -190,33 +106,6 @@ struct SettingsView: View {
         }
     }
     
-    private func performAuth() {
-        isLoading = true
-        errorMessage = nil
-        
-        Task {
-            do {
-                if isRegistering {
-                    _ = try await BackendService.shared.register(email: email, password: password, name: name)
-                } else {
-                    _ = try await BackendService.shared.login(email: email, password: password)
-                }
-                
-                await MainActor.run {
-                    isLoading = false
-                    email = ""
-                    password = ""
-                    name = ""
-                }
-            } catch {
-                await MainActor.run {
-                    isLoading = false
-                    errorMessage = error.localizedDescription
-                }
-            }
-        }
-    }
-    
     private func saveSettings() {
         ElevenLabsService.shared.setAPIKey(elevenLabsKey)
         dismiss()
@@ -236,17 +125,10 @@ struct APIKeyInfoView: View {
                     
                     VStack(alignment: .leading, spacing: 12) {
                         InfoRow(
-                            icon: "person.circle",
-                            title: "Account Login",
-                            description: "Create an account or login to enable AI features. Your requests are processed securely on our server using OpenAI.",
-                            link: "https://knowbest-backend.onrender.com"
-                        )
-                        
-                        InfoRow(
                             icon: "brain",
                             title: "AI Powered",
-                            description: "When logged in, your voice commands are understood using GPT-4o-mini. No need for your own OpenAI key!",
-                            link: "https://openai.com"
+                            description: "Adam uses local AI to understand your voice commands. Everything works offline!",
+                            link: ""
                         )
                         
                         InfoRow(
@@ -264,18 +146,9 @@ struct APIKeyInfoView: View {
                         .fontWeight(.semibold)
                     
                     Text("• Your todos are stored locally on your device")
-                    Text("• Voice commands are processed securely")
+                    Text("• Voice commands are processed on your device")
                     Text("• Eleven Labs key is stored only on your device")
-                    
-                    Divider()
-                    
-                    Text("Without Login")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                    
-                    Text("• Basic voice recognition still works")
-                    Text("• Simple commands like 'Remind me to...' are parsed locally")
-                    Text("• Login for better understanding of complex requests")
+                    Text("• No data is sent to any server")
                     
                     Spacer()
                 }
