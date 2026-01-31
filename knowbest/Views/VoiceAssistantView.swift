@@ -371,6 +371,9 @@ struct VoiceAssistantView: View {
                 await MainActor.run {
                     isProcessing = false
                     
+                    // Debug: Log response
+                    print("🔍 AI Response - Todos count: \(response.todos.count), Needs clarification: \(response.needsClarification)")
+                    
                     // Handle questions
                     if let questions = response.questions, !questions.isEmpty {
                         currentQuestion = questions.first
@@ -386,25 +389,40 @@ struct VoiceAssistantView: View {
                         
                         // Process todos
                         if !response.todos.isEmpty {
-                            // Use response from AI if available, otherwise generate our own
-                            let responseText = response.response ?? "I've created \(response.todos.count) todo\(response.todos.count > 1 ? "s" : "") for you."
-                            let emotion = response.emotion ?? "encouraging"
+                            var createdTitles: [String] = []
                             
+                            // Actually create the todos
                             for todoData in response.todos {
                                 let todo = createTodo(from: todoData)
                                 store.addTodo(todo)
+                                createdTitles.append(todo.title)
                                 
-                                if todo.reminderDate != nil {
+                                // Schedule notification
+                                if let reminderDate = todo.reminderDate {
                                     NotificationManager.shared.scheduleReminder(for: todo)
                                 }
                                 
-                                if todo.dueDate != nil {
+                                // Add to calendar
+                                if let dueDate = todo.dueDate {
                                     Task {
                                         await CalendarManager.shared.addTodoToCalendar(todo)
                                     }
                                 }
                             }
                             
+                            // Only say we created todos if we actually did
+                            let responseText: String
+                            if let aiResponse = response.response, !aiResponse.isEmpty {
+                                responseText = aiResponse
+                            } else {
+                                if createdTitles.count == 1 {
+                                    responseText = "Done! I've added \"\(createdTitles[0])\" to your list."
+                                } else {
+                                    responseText = "Done! I've added \(createdTitles.count) tasks to your list."
+                                }
+                            }
+                            
+                            let emotion = response.emotion ?? "encouraging"
                             conversationHistory.append(responseText)
                             assistantResponse = responseText
                             
