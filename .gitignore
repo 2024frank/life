@@ -99,8 +99,10 @@ backend/.DS_Store
 # API Keys - NEVER commit these!
 APIKeys.plist
 APIKeys.swift
+APIKeys.local.swift
 *.apikeys
 *.secrets
+**/APIKeys.local.swift
 
 # macOS
 .DS_Store

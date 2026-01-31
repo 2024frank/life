@@ -9,6 +9,11 @@ import Foundation
 import Combine
 import AVFoundation
 
+// MARK: - Local API Keys (DEV ONLY - Remove before production)
+#if DEBUG
+private let LOCAL_ELEVENLABS_KEY = "4fa9cd17455dcfb60218e0a5f0b91cedfdfe03d5c14e611fd8508909533eea8c"
+#endif
+
 // Emotion types for voice modulation
 enum VoiceEmotion: String {
     case happy = "happy"
@@ -76,15 +81,22 @@ class ElevenLabsService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var systemSynthesizer: AVSpeechSynthesizer?
     
     private var apiKey: String {
-        // 1. Check UserDefaults (set in app)
+        // 1. Check local hardcoded key (DEBUG only - remove before production)
+        #if DEBUG
+        if !LOCAL_ELEVENLABS_KEY.isEmpty {
+            return LOCAL_ELEVENLABS_KEY
+        }
+        #endif
+        
+        // 2. Check UserDefaults (set in app)
         if let key = UserDefaults.standard.string(forKey: "ElevenLabsAPIKey"), !key.isEmpty {
             return key
         }
-        // 2. Check environment variable (from build settings)
+        // 3. Check environment variable (from build settings)
         if let key = ProcessInfo.processInfo.environment["ELEVENLABS_API_KEY"], !key.isEmpty {
             return key
         }
-        // 3. Check Info.plist (from build settings)
+        // 4. Check Info.plist (from build settings)
         if let key = Bundle.main.object(forInfoDictionaryKey: "ELEVENLABS_API_KEY") as? String, !key.isEmpty {
             return key
         }
